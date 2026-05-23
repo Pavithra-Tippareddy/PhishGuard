@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishGuard — Email Threat Analyser</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0e1a;
+    --surface:   #111827;
+    --border:    #1e2d45;
+    --accent:    #00d4ff;
+    --accent2:   #ff4757;
+    --accent3:   #2ecc71;
+    --warn:      #f39c12;
+    --text:      #e8edf5;
+    --muted:     #6b7fa3;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+    animation: fadeDown 0.7s ease both;
+  }
+
+  .logo-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 12px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 12px;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+
+  /* Form card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 32px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .card:nth-child(2) { animation-delay: 0.1s; }
+  .card:nth-child(3) { animation-delay: 0.2s; }
+
+  .card-title {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .field {
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  input[type="text"], textarea, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: vertical;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,212,255,0.08);
+  }
+
+  textarea { min-height: 90px; }
+
+  select option { background: var(--surface); }
+
+  /* Checkbox group */
+  .check-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    font-size: 12px;
+    color: var(--muted);
+    user-select: none;
+  }
+
+  .check-item:hover { border-color: var(--accent); color: var(--text); }
+
+  .check-item input[type="checkbox"] { display: none; }
+
+  .check-box {
+    width: 16px; height: 16px;
+    border: 1px solid var(--muted);
+    border-radius: 2px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    font-size: 10px;
+  }
+
+  .check-item.checked {
+    border-color: var(--accent2);
+    background: rgba(255,71,87,0.06);
+    color: var(--text);
+  }
+
+  .check-item.checked .check-box {
+    background: var(--accent2);
+    border-color: var(--accent2);
+    color: white;
+  }
+
+  /* Analyse button */
+  .btn-analyse {
+    width: 100%;
+    padding: 16px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-head);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .btn-analyse::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 0;
+  }
+
+  .btn-analyse:hover::before { transform: translateX(0); }
+  .btn-analyse:hover { color: var(--bg); }
+  .btn-analyse span { position: relative; z-index: 1; }
+
+  /* Results */
+  #results { display: none; }
+
+  .risk-banner {
+    padding: 28px 32px;
+    border-radius: 2px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .risk-icon {
+    font-size: 48px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .risk-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    opacity: 0.7;
+  }
+
+  .risk-level {
+    font-family: var(--font-head);
+    font-size: 2.4rem;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .risk-score {
+    font-size: 12px;
+    opacity: 0.6;
+  }
+
+  .risk-critical { background: rgba(255,71,87,0.12); border: 1px solid var(--accent2); }
+  .risk-high     { background: rgba(243,156,18,0.12); border: 1px solid var(--warn); }
+  .risk-medium   { background: rgba(243,156,18,0.08); border: 1px solid #d4ac0d; }
+  .risk-low      { background: rgba(46,204,113,0.08); border: 1px solid var(--accent3); }
+  .risk-safe     { background: rgba(46,204,113,0.12); border: 1px solid var(--accent3); }
+
+  .risk-critical .risk-level { color: var(--accent2); }
+  .risk-high     .risk-level { color: var(--warn); }
+  .risk-medium   .risk-level { color: #f1c40f; }
+  .risk-low      .risk-level { color: #f1c40f; }
+  .risk-safe     .risk-level { color: var(--accent3); }
+
+  /* Checks list */
+  .checks-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .check-result {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 2px;
+    animation: fadeUp 0.4s ease both;
+    border-left: 3px solid transparent;
+  }
+
+  .check-result.fail  { background: rgba(255,71,87,0.07);  border-color: var(--accent2); }
+  .check-result.warn  { background: rgba(243,156,18,0.07); border-color: var(--warn); }
+  .check-result.pass  { background: rgba(46,204,113,0.07); border-color: var(--accent3); }
+
+  .check-status {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .check-name {
+    font-family: var(--font-head);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .check-detail {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .check-result.fail  .check-name { color: var(--accent2); }
+  .check-result.warn  .check-name { color: var(--warn); }
+  .check-result.pass  .check-name { color: var(--accent3); }
+
+  /* Advice box */
+  .advice-box {
+    background: rgba(0,212,255,0.05);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 20px 24px;
+    border-radius: 2px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.5s 0.3s ease both;
+  }
+
+  .advice-title {
+    font-family: var(--font-head);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .advice-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .advice-list li {
+    font-size: 12px;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.5;
+  }
+
+  .advice-list li::before {
+    content: '→';
+    color: var(--accent);
+    flex-shrink: 0;
+    font-weight: bold;
+  }
+
+  /* Education section */
+  .edu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .edu-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 16px;
+    border-radius: 2px;
+  }
+
+  .edu-card-title {
+    font-family: var(--font-head);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .edu-card p {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* Reset button */
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .btn-reset:hover { border-color: var(--muted); color: var(--text); }
+
+  /* Score bar */
+  .score-bar-wrap {
+    margin-top: 8px;
+  }
+
+  .score-bar-bg {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Pulse on critical */
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,71,87,0.4); }
+    50%       { box-shadow: 0 0 0 8px rgba(255,71,87,0); }
+  }
+
+  .pulse { animation: pulse-border 2s infinite; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .check-group  { grid-template-columns: 1fr; }
+    .edu-grid     { grid-template-columns: 1fr; }
+    .risk-banner  { flex-direction: column; text-align: center; }
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 24px 0;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-top: 48px;
+    opacity: 0.5;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-tag">🛡 Security Tool v1.0</div>
+    <h1>Phish<span>Guard</span></h1>
+    <p class="subtitle">Email Threat Analyser — Identify phishing attempts before they cause damage</p>
+  </header>
+
+  <!-- Input Form -->
+  <div id="form-section">
+    <div class="card">
+      <div class="card-title">📧 Email Details</div>
+
+      <div class="field">
+        <label>Sender Email Address</label>
+        <input type="text" id="sender" placeholder="e.g. support@sharepoint-documents-login.lv">
+      </div>
+
+      <div class="field">
+        <label>Email Subject Line</label>
+        <input type="text" id="subject" placeholder="e.g. Updated participant payment list — Action Required">
+      </div>
+
+      <div class="field">
+        <label>Link / URL in Email (if any)</label>
+        <input type="text" id="url" placeholder="e.g. https://sharepoint-documents-login.lv/payment-list">
+      </div>
+
+      <div class="field">
+        <label>Email Body (paste key content)</label>
+        <textarea id="body" placeholder="Paste the email text here, or describe what it says..."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Email Authentication Result</label>
+        <select id="auth">
+          <option value="both">✅ SPF passed + DKIM passed</option>
+          <option value="spf_only">⚠️ SPF passed — DKIM failed</option>
+          <option value="dkim_only">⚠️ DKIM passed — SPF failed</option>
+          <option value="neither">❌ Both SPF and DKIM failed</option>
+          <option value="unknown">❓ Unknown / not checked</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🚩 Additional Red Flags Observed</div>
+      <p style="font-size:11px; color:var(--muted); margin-bottom:16px;">
+        Select any additional suspicious behaviours you noticed in this email:
+      </p>
+      <div class="check-group" id="flags">
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="urgency">
+          <span class="check-box"></span>
+          Creates urgency / pressure
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="credential_request">
+          <span class="check-box"></span>
+          Asks you to sign in / enter password
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="unexpected">
+          <span class="check-box"></span>
+          Unexpected / unsolicited email
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="name_mismatch">
+          <span class="check-box"></span>
+          Display name doesn't match sender
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="generic_greeting">
+          <span class="check-box"></span>
+          Generic greeting (Dear User, etc.)
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="financial">
+          <span class="check-box"></span>
+          Mentions money / payments / bank details
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="grammar">
+          <span class="check-box"></span>
+          Poor grammar or spelling mistakes
+        </label>
+        <label class="check-item" onclick="toggleCheck(this)">
+          <input type="checkbox" value="suspicious_attachment">
+          <span class="check-box"></span>
+          Suspicious attachment (.docm, .exe, .zip)
+        </label>
+      </div>
+    </div>
+
+    <button class="btn-analyse" onclick="analyse()"><span>⚡ Analyse Email Threat</span></button>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div id="risk-banner" class="risk-banner">
+      <div class="risk-icon" id="risk-icon"></div>
+      <div>
+        <div class="risk-label">Threat Assessment</div>
+        <div class="risk-level" id="risk-level-text"></div>
+        <div class="risk-score" id="risk-score-text"></div>
+        <div class="score-bar-wrap">
+          <div class="score-bar-bg">
+            <div class="score-bar-fill" id="score-bar" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔍 Check Results</div>
+      <div class="checks-grid" id="checks-grid"></div>
+    </div>
+
+    <div class="advice-box">
+      <div class="advice-title">💡 Recommended Actions</div>
+      <ul class="advice-list" id="advice-list"></ul>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📚 Learn — What These Attacks Mean</div>
+      <div class="edu-grid" id="edu-grid"></div>
+    </div>
+
+    <div style="margin-top:24px; text-align:center;">
+      <button class="btn-reset" onclick="reset()">↩ Analyse Another Email</button>
+    </div>
+  </div>
+
+  <footer>PhishGuard — Built for RigaTechGirl Security Awareness Training</footer>
+</div>
+
+<script>
+function toggleCheck(label) {
+  const cb = label.querySelector('input[type="checkbox"]');
+  cb.checked = !cb.checked;
+  label.classList.toggle('checked', cb.checked);
+  const box = label.querySelector('.check-box');
+  box.textContent = cb.checked ? '✓' : '';
+}
+
+function getChecked() {
+  return [...document.querySelectorAll('#flags input[type="checkbox"]')]
+    .filter(cb => cb.checked).map(cb => cb.value);
+}
+
+function analyse() {
+  const sender  = document.getElementById('sender').value.trim();
+  const subject = document.getElementById('subject').value.trim().toLowerCase();
+  const url     = document.getElementById('url').value.trim().toLowerCase();
+  const body    = document.getElementById('body').value.trim().toLowerCase();
+  const auth    = document.getElementById('auth').value;
+  const flags   = getChecked();
+
+  let score = 0;
+  let checks = [];
+  let detectedAttacks = new Set();
+
+  // 1. Sender domain analysis
+  const suspiciousTLDs = ['.lv','.ru','.cn','.tk','.ml','.ga','.cf','.gq','.xyz','.top','.click'];
+  const brandKeywords  = ['microsoft','sharepoint','google','paypal','amazon','apple','docusign','dropbox','netflix','office365'];
+  const senderLower    = sender.toLowerCase();
+  const hasSuspTLD     = suspiciousTLDs.some(t => senderLower.includes(t));
+  const hasBrandSpoof  = brandKeywords.some(b => senderLower.includes(b)) &&
+                         !senderLower.endsWith('@microsoft.com') &&
+                         !senderLower.endsWith('@google.com') &&
+                         !senderLower.endsWith('@apple.com') &&
+                         !senderLower.endsWith('@amazon.com');
+  const hasHyphenDomain = /@[a-z0-9]+-[a-z0-9]/.test(senderLower);
+
+  if (!sender) {
+    checks.push({ status:'warn', name:'Sender Address', detail:'No sender address provided — always verify the sender before acting on any email.' });
+  } else if (hasBrandSpoof || hasSuspTLD || hasHyphenDomain) {
+    score += 35;
+    let reasons = [];
+    if (hasBrandSpoof)   { reasons.push('impersonates a known brand'); detectedAttacks.add('Domain Spoofing'); }
+    if (hasSuspTLD)      reasons.push('uses an unusual country domain');
+    if (hasHyphenDomain) reasons.push('uses a hyphenated domain (common in fake sites)');
+    checks.push({ status:'fail', name:'⚠ Suspicious Sender Domain', detail: `Sender domain is suspicious: ${reasons.join(', ')}. Legitimate companies use their own verified domain.` });
+  } else {
+    checks.push({ status:'pass', name:'Sender Domain', detail:'Sender domain appears legitimate. Always double-check against the company\'s real domain.' });
+  }
+
+  // 2. DKIM/SPF authentication
+  if (auth === 'neither') {
+    score += 30; checks.push({ status:'fail', name:'⚠ Email Authentication Failed', detail:'Both SPF and DKIM failed. This email cannot be verified as genuinely coming from the claimed sender — strong indicator of spoofing.' }); detectedAttacks.add('Email Spoofing');
+  } else if (auth === 'spf_only' || auth === 'dkim_only') {
+    score += 15; checks.push({ status:'warn', name:'⚠ Partial Authentication Failure', detail:'One of SPF or DKIM failed. Legitimate emails from major providers should pass both checks. Treat with caution.' });
+  } else if (auth === 'unknown') {
+    score += 5; checks.push({ status:'warn', name:'Authentication Unknown', detail:'Email authentication status not checked. Always verify SPF and DKIM results in your email security gateway.' });
+  } else {
+    checks.push({ status:'pass', name:'Email Authentication', detail:'SPF and DKIM both passed — the email origin is verified. Note: this alone does not guarantee the email is safe.' });
+  }
+
+  // 3. URL analysis
+  if (url) {
+    const urlSuspTLD     = suspiciousTLDs.some(t => url.includes(t));
+    const urlBrandSpoof  = brandKeywords.some(b => url.includes(b)) && !url.includes(b + '.com/');
+    const urlHasLogin    = url.includes('login') || url.includes('signin') || url.includes('verify') || url.includes('auth');
+    const urlHasHyphen   = /\/\/[a-z0-9]+-[a-z0-9]/.test(url);
+    const urlLongSub     = (url.match(/\./g) || []).length > 3;
+
+    let urlIssues = [];
+    if (urlBrandSpoof)  { urlIssues.push('contains a brand name but not on that brand\'s real domain'); detectedAttacks.add('Credential Harvesting'); }
+    if (urlSuspTLD)     urlIssues.push('uses an unusual country domain');
+    if (urlHasLogin)    { urlIssues.push('contains login/verify keywords — likely a credential harvesting page'); detectedAttacks.add('Credential Harvesting'); }
+    if (urlHasHyphen)   urlIssues.push('uses hyphens in domain (common phishing pattern)');
+    if (urlLongSub)     urlIssues.push('unusually deep subdomain structure');
+
+    if (urlIssues.length > 0) {
+      score += 25;
+      checks.push({ status:'fail', name:'⚠ Suspicious URL Detected', detail:'URL red flags: ' + urlIssues.join('; ') + '. Do NOT click this link.' });
+    } else {
+      checks.push({ status:'pass', name:'URL Analysis', detail:'No obvious URL red flags detected. Still verify the domain carefully before clicking.' });
+    }
+  } else {
+    checks.push({ status:'pass', name:'URL / Link', detail:'No URL provided or no link in email. If there is a link, always hover over it first to preview the real destination.' });
+  }
+
+  // 4. Urgency language
+  const urgencyWords = ['urgent','immediately','action required','verify now','account suspended','unusual activity','click here','limited time','expires','confirm now','your account','act now','24 hours','suspended','locked'];
+  const foundUrgency = urgencyWords.filter(w => subject.includes(w) || body.includes(w));
+  if (flags.includes('urgency') || foundUrgency.length >= 2) {
+    score += 15;
+    checks.push({ status:'warn', name:'⚠ Urgency / Pressure Tactics', detail:`Urgency language detected${foundUrgency.length ? ': "' + foundUrgency.slice(0,3).join('", "') + '"' : ''}. Attackers create pressure to stop you thinking critically. Legitimate organisations do not demand immediate action via email.` });
+    detectedAttacks.add('Social Engineering');
+  } else if (foundUrgency.length === 1) {
+    score += 5;
+    checks.push({ status:'warn', name:'Mild Urgency Language', detail:'Some urgency detected. Be cautious — verify through official channels if unsure.' });
+  } else {
+    checks.push({ status:'pass', name:'Urgency Language', detail:'No strong urgency language detected in subject or body.' });
+  }
+
+  // 5. Credential request
+  const credWords = ['sign in','login','password','enter your','verify your','confirm your credentials','microsoft account'];
+  const foundCred = credWords.some(w => body.includes(w));
+  if (flags.includes('credential_request') || foundCred) {
+    score += 20; checks.push({ status:'fail', name:'⚠ Credential Request Detected', detail:'This email asks you to enter login credentials. Legitimate services never ask for your password via email. This is a classic phishing technique.' }); detectedAttacks.add('Credential Harvesting');
+  } else {
+    checks.push({ status:'pass', name:'Credential Request', detail:'No credential harvesting language detected in email body.' });
+  }
+
+  // 6. Financial / payment keywords
+  const finWords = ['bank detail','payment','invoice','transfer','salary','payroll','reimbursement','wire','updated account'];
+  const foundFin = finWords.filter(w => subject.includes(w) || body.includes(w));
+  if (flags.includes('financial') || foundFin.length >= 1) {
+    score += 15; checks.push({ status:'warn', name:'⚠ Financial Content Detected', detail:`Financial keywords found${foundFin.length ? ': "' + foundFin.slice(0,3).join('", "') + '"' : ''}. Emails requesting bank detail changes or payments are a top Business Email Compromise (BEC) vector. Always verify via phone before acting.` }); detectedAttacks.add('Business Email Compromise (BEC)');
+  } else {
+    checks.push({ status:'pass', name:'Financial Keywords', detail:'No financial red flags detected in subject or body.' });
+  }
+
+  // 7. Suspicious attachment
+  const suspAttach = ['.docm','.xlsm','.exe','.bat','.vbs','.ps1','.zip','.rar','.iso'];
+  const foundAttach = suspAttach.some(ext => body.includes(ext) || subject.includes(ext));
+  if (flags.includes('suspicious_attachment') || foundAttach) {
+    score += 20; checks.push({ status:'fail', name:'⚠ Suspicious Attachment Type', detail:'Macro-enabled documents (.docm, .xlsm) or executable files are frequently used to deliver malware. Never enable macros in documents from unknown sources.' }); detectedAttacks.add('Malicious Macro / Malware Delivery');
+  } else {
+    checks.push({ status:'pass', name:'Attachment Type', detail:'No suspicious attachment types detected.' });
+  }
+
+  // 8. Additional flags
+  if (flags.includes('name_mismatch')) {
+    score += 10; checks.push({ status:'warn', name:'⚠ Sender Name Mismatch', detail:'The display name does not match the actual sender email address. This is a common spoofing technique — attackers set the display name to a trusted person or company while the actual address is malicious.' }); detectedAttacks.add('Display Name Spoofing');
+  }
+  if (flags.includes('generic_greeting')) {
+    score += 5; checks.push({ status:'warn', name:'Generic Greeting Detected', detail:'Legitimate organisations usually address you by name. Generic greetings suggest a mass phishing campaign.' });
+  }
+  if (flags.includes('grammar')) {
+    score += 5; checks.push({ status:'warn', name:'Grammar / Spelling Issues', detail:'Poor grammar can indicate the email was written by a non-native speaker or generated automatically — common in phishing campaigns.' });
+  }
+  if (flags.includes('unexpected')) {
+    score += 10; checks.push({ status:'warn', name:'⚠ Unexpected / Unsolicited Email', detail:'You were not expecting this email. Unsolicited emails asking for action are a primary phishing vector.' });
+  }
+
+  // Cap score
+  score = Math.min(score, 100);
+
+  // Determine risk level
+  let riskClass, riskText, riskIcon, barColor;
+  if (score >= 75)      { riskClass='risk-critical'; riskText='CRITICAL THREAT';  riskIcon='🚨'; barColor='#ff4757'; }
+  else if (score >= 50) { riskClass='risk-high';     riskText='HIGH RISK';        riskIcon='⚠️';  barColor='#f39c12'; }
+  else if (score >= 30) { riskClass='risk-medium';   riskText='MEDIUM RISK';      riskIcon='⚡'; barColor='#f1c40f'; }
+  else if (score >= 10) { riskClass='risk-low';      riskText='LOW RISK';         riskIcon='🔍'; barColor='#f1c40f'; }
+  else                  { riskClass='risk-safe';     riskText='LIKELY SAFE';      riskIcon='✅'; barColor='#2ecc71'; }
+
+  // Build advice
+  let advice = [];
+  if (score >= 50) {
+    advice.push('Do NOT click any links or open any attachments in this email.');
+    advice.push('Report this email to your IT/Security team immediately using the "Report Phishing" button.');
+    advice.push('If you already clicked a link or entered credentials, change your password immediately and notify IT.');
+  }
+  if (score >= 30) {
+    advice.push('Verify the sender by contacting them through a known phone number or official website — not by replying to this email.');
+    advice.push('If the email mentions bank details or payments, call the person directly to confirm before taking any action.');
+  }
+  if (detectedAttacks.has('Credential Harvesting')) {
+    advice.push('If you entered your password on a linked page, revoke all active sessions in your Microsoft 365 account immediately.');
+  }
+  if (detectedAttacks.has('Malicious Macro / Malware Delivery')) {
+    advice.push('If you opened a .docm or .xlsm file and enabled macros, isolate your device and contact IT immediately.');
+  }
+  if (score < 30) {
+    advice.push('This email shows few red flags, but always verify unexpected requests through official channels.');
+    advice.push('Enable MFA on all accounts as an extra layer of protection.');
+  }
+
+  // Education cards
+  const eduCards = {
+    'Domain Spoofing':        { icon:'🎭', desc:'Attackers register domains that look like trusted brands (e.g. sharepoint-support.lv). Always check the full domain after the @ symbol.' },
+    'Credential Harvesting':  { icon:'🎣', desc:'Fake login pages that steal your username and password. The page looks real but sends your credentials directly to the attacker.' },
+    'Business Email Compromise (BEC)': { icon:'💸', desc:'Attacker impersonates a trusted person to redirect payments. Always verify bank detail changes by phone — never by email alone.' },
+    'Social Engineering':     { icon:'🧠', desc:'Psychological manipulation using urgency, fear, or authority to make you act without thinking. Pause and verify before acting.' },
+    'Email Spoofing':         { icon:'📨', desc:'Forging the "From" address to impersonate a trusted sender. DKIM/SPF failures are a key indicator. Check email headers when suspicious.' },
+    'Malicious Macro / Malware Delivery': { icon:'☠️', desc:'Malware hidden inside Office documents. When you "Enable Content", macros execute and can install ransomware or spyware.' },
+    'Display Name Spoofing':  { icon:'👤', desc:'Setting a familiar display name while using a malicious email address. Always expand the sender field to see the full address.' },
+  };
+
+  // Render
+  document.getElementById('form-section').style.display = 'none';
+  const resultsDiv = document.getElementById('results');
+  resultsDiv.style.display = 'block';
+
+  const banner = document.getElementById('risk-banner');
+  banner.className = 'risk-banner ' + riskClass;
+  if (score >= 75) banner.classList.add('pulse');
+  document.getElementById('risk-icon').textContent       = riskIcon;
+  document.getElementById('risk-level-text').textContent = riskText;
+  document.getElementById('risk-score-text').textContent = `Threat score: ${score}/100`;
+  const bar = document.getElementById('score-bar');
+  bar.style.background = barColor;
+  setTimeout(() => bar.style.width = score + '%', 100);
+
+  const grid = document.getElementById('checks-grid');
+  grid.innerHTML = '';
+  checks.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = `check-result ${c.status}`;
+    div.style.animationDelay = (i * 0.05) + 's';
+    const icon = c.status === 'fail' ? '✗' : c.status === 'warn' ? '!' : '✓';
+    div.innerHTML = `
+      <div class="check-status">${icon}</div>
+      <div>
+        <div class="check-name">${c.name}</div>
+        <div class="check-detail">${c.detail}</div>
+      </div>`;
+    grid.appendChild(div);
+  });
+
+  const adviceList = document.getElementById('advice-list');
+  adviceList.innerHTML = advice.map(a => `<li>${a}</li>`).join('');
+
+  const eduGrid = document.getElementById('edu-grid');
+  eduGrid.innerHTML = '';
+  if (detectedAttacks.size === 0) {
+    eduGrid.innerHTML = '<p style="font-size:12px;color:var(--muted);grid-column:1/-1">No specific attack techniques detected. Good news — this email appears relatively safe based on the information provided.</p>';
+  } else {
+    detectedAttacks.forEach(attack => {
+      if (eduCards[attack]) {
+        const card = document.createElement('div');
+        card.className = 'edu-card';
+        card.innerHTML = `
+          <div class="edu-card-title">${eduCards[attack].icon} ${attack}</div>
+          <p>${eduCards[attack].desc}</p>`;
+        eduGrid.appendChild(card);
+      }
+    });
+  }
+
+  resultsDiv.scrollIntoView({ behavior: 'smooth' });
+}
+
+function reset() {
+  document.getElementById('sender').value  = '';
+  document.getElementById('subject').value = '';
+  document.getElementById('url').value     = '';
+  document.getElementById('body').value    = '';
+  document.getElementById('auth').value    = 'both';
+  document.querySelectorAll('#flags .check-item').forEach(el => {
+    el.classList.remove('checked');
+    el.querySelector('input').checked = false;
+    el.querySelector('.check-box').textContent = '';
+  });
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('form-section').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
